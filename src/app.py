@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+from langchain_core.messages import HumanMessage, AIMessage
 from rag import setup_rag_chain
 from ingest import main as run_ingestion
 
@@ -67,9 +68,18 @@ if prompt := st.chat_input("How do I create a custom layer?"):
             message_placeholder = st.empty()
             full_response = ""
 
+            chat_history = []
+            for msg in st.session_state.messages[:-1]:
+                if msg["role"] == "user":
+                    chat_history.append(HumanMessage(content=msg["content"]))
+                elif msg["role"] == "assistant":
+                    chat_history.append(AIMessage(content=msg["content"]))
+
             with st.spinner("Analyzing codebase..."):
                 try:
-                    response = rag_chain.invoke({"input": prompt})
+                    response = rag_chain.invoke(
+                        {"input": prompt, "chat_history": chat_history}
+                    )
                     answer = response["answer"]
 
                     message_placeholder.markdown(answer)

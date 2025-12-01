@@ -1,5 +1,6 @@
 import os
 from termcolor import cprint
+from langchain_core.messages import HumanMessage, AIMessage
 from rag import setup_rag_chain
 
 
@@ -22,6 +23,8 @@ def main():
         "green",
     )
 
+    chat_history = []
+
     while True:
         try:
             query = input("\n👉 You: ")
@@ -34,10 +37,13 @@ def main():
 
             cprint("Searching...", "grey")
 
-            response = rag_chain.invoke({"input": query})
+            response = rag_chain.invoke({"input": query, "chat_history": chat_history})
 
             print("\n🤖 \033[1mAssistant:\033[0m")
             print(response["answer"])
+
+            chat_history.append(HumanMessage(content=query))
+            chat_history.append(AIMessage(content=response["answer"]))
 
             # Display sources
             print("\n\033[90m--- Sources used ---\033[0m")
@@ -61,4 +67,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
