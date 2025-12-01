@@ -8,24 +8,23 @@ load_dotenv()
 
 def get_llm(temperature=0.7):
     llm_type = os.getenv("LLM_TYPE", "gemini").lower()
+    llm_model = os.getenv("LLM_MODEL")
 
     if llm_type == "gemini":
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GOOGLE_API_KEY is missing in .env file")
         return ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash", google_api_key=api_key, temperature=temperature
+            model=llm_model or "gemini-2.5-flash",
+            google_api_key=api_key,
+            temperature=temperature,
         )
     elif llm_type == "openai":
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
+        if not os.getenv("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY is missing in .env file")
-        return ChatOpenAI(
-            model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=temperature
-        )
+        return ChatOpenAI(model=llm_model or "gpt-5-nano", temperature=temperature)
     elif llm_type == "ollama":
-        model_name = os.getenv("OLLAMA_MODEL", "llama3")
-        return ChatOllama(model=model_name, temperature=temperature)
+        return ChatOllama(model=llm_model or "llama3", temperature=temperature)
     else:
         raise ValueError(f"Unsupported or unconfigured LLM type: {llm_type}")
 
@@ -52,7 +51,7 @@ def get_embeddings():
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY is missing in .env file")
-        return OpenAIEmbeddings(openai_api_key=api_key)
+        return OpenAIEmbeddings()
 
     else:
         from langchain_community.embeddings import HuggingFaceEmbeddings
