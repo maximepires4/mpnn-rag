@@ -1,14 +1,11 @@
 import os
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_chroma import Chroma
-
-# Handling imports for different LangChain versions/environments
-try:
-    from langchain.chains.retrieval import create_retrieval_chain
-    from langchain.chains.combine_documents import create_stuff_documents_chain
-except ImportError:
-    from langchain_classic.chains import create_retrieval_chain
-    from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+from langchain_classic.retrievers import ContextualCompressionRetriever
+from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
+from langchain_classic.chains import create_retrieval_chain
+from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 
 from config import get_llm, get_embeddings, get_persist_directory
 
@@ -28,7 +25,17 @@ def setup_rag_chain():
     vector_db = Chroma(
         persist_directory=persist_directory, embedding_function=embeddings
     )
-    retriever = vector_db.as_retriever(search_kwargs={"k": 4})
+
+    base_retriever = vector_db.as_retriever(search_kwargs={"k": 10})
+
+    compressor_model = HuggingFaceCrossEncoder(
+        model_name="cross-encoder/ms-marco-MiniLM-L-6-v2"
+    )
+    document_compressor = CrossEncoderReranker(model=compressor_model, top_n=4)
+
+    retriever = ContextualCompressionRetriever(
+        base_compressor=document_compressor, base_retriever=base_retriever
+    )
 
     system_prompt = (
         "You are an expert assistant tasked with helping developers use the 'MPNeuralNetwork' library. "
