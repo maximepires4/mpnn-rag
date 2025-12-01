@@ -17,7 +17,7 @@ from langchain_community.retrievers import BM25Retriever
 from config import get_llm, get_embeddings, get_persist_directory
 
 
-def setup_rag_chain():
+def setup_rag_chain(k=4, temperature=0.7):
     persist_directory = get_persist_directory()
 
     if not os.path.exists(persist_directory):
@@ -27,13 +27,14 @@ def setup_rag_chain():
         return None
 
     embeddings = get_embeddings()
-    llm = get_llm()
+    llm = get_llm(temperature=temperature)
 
     vector_db = Chroma(
         persist_directory=persist_directory, embedding_function=embeddings
     )
 
-    dense_retriever = vector_db.as_retriever(search_kwargs={"k": 10})
+    initial_k = k * 3
+    dense_retriever = vector_db.as_retriever(search_kwargs={"k": initial_k})
 
     try:
         print("Initializing BM25 Retriever for Hybrid Search...")
@@ -46,7 +47,7 @@ def setup_rag_chain():
                 texts=collection_data["documents"],
                 metadatas=collection_data["metadatas"],
             )
-            bm25_retriever.k = 10
+            bm25_retriever.k = initial_k
 
             base_retriever = EnsembleRetriever(
                 retrievers=[dense_retriever, bm25_retriever], weights=[0.5, 0.5]
@@ -58,7 +59,7 @@ def setup_rag_chain():
     compressor_model = HuggingFaceCrossEncoder(
         model_name="cross-encoder/ms-marco-MiniLM-L-6-v2"
     )
-    document_compressor = CrossEncoderReranker(model=compressor_model, top_n=4)
+    document_compressor = CrossEncoderReranker(model=compressor_model, top_n=k)
 
     retriever = ContextualCompressionRetriever(
         base_compressor=document_compressor, base_retriever=base_retriever

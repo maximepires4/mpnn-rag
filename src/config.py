@@ -6,7 +6,7 @@ from langchain_community.chat_models import ChatOpenAI, ChatOllama
 load_dotenv()
 
 
-def get_llm():
+def get_llm(temperature=0.7):
     llm_type = os.getenv("LLM_TYPE", "gemini").lower()
 
     if llm_type == "gemini":
@@ -14,16 +14,18 @@ def get_llm():
         if not api_key:
             raise ValueError("GOOGLE_API_KEY is missing in .env file")
         return ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash", google_api_key=api_key, temperature=0.7
+            model="gemini-2.5-flash", google_api_key=api_key, temperature=temperature
         )
     elif llm_type == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY is missing in .env file")
-        return ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=api_key)
+        return ChatOpenAI(
+            model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=temperature
+        )
     elif llm_type == "ollama":
         model_name = os.getenv("OLLAMA_MODEL", "llama3")
-        return ChatOllama(model=model_name, temperature=0.7)
+        return ChatOllama(model=model_name, temperature=temperature)
     else:
         raise ValueError(f"Unsupported or unconfigured LLM type: {llm_type}")
 
@@ -69,4 +71,3 @@ def get_repo_config():
 
 def get_persist_directory():
     return os.path.join(os.getcwd(), "data", "chroma_db")
-

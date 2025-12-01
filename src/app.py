@@ -17,6 +17,24 @@ with st.sidebar:
     st.header("Settings")
     st.markdown("Manage the knowledge base and configuration.")
 
+    st.subheader("Parameters")
+    k_param = st.slider(
+        "Retrieval Count (k)",
+        min_value=1,
+        max_value=10,
+        value=4,
+        help="Number of documents to retrieve for context.",
+    )
+
+    temperature_param = st.slider(
+        "Temperature (Creativity)",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.7,
+        step=0.1,
+        help="Controls the randomness of the output.",
+    )
+
     if st.button(
         "🔄 Update Knowledge Base",
         help="Clone/Pull the repo and rebuild the vector database.",
@@ -27,7 +45,7 @@ with st.sidebar:
                 run_ingestion()
                 st.write("Ingestion complete!")
                 status.update(
-                    label="Knowledge Base Updated!", state="complete", expanded=False
+                    label="Knowledge Base Updated", state="complete", expanded=False
                 )
 
                 st.cache_resource.clear()
@@ -38,12 +56,12 @@ with st.sidebar:
 
 
 @st.cache_resource
-def get_rag_chain():
-    return setup_rag_chain()
+def get_rag_chain(k, temperature):
+    return setup_rag_chain(k=k, temperature=temperature)
 
 
 try:
-    rag_chain = get_rag_chain()
+    rag_chain = get_rag_chain(k_param, temperature_param)
 except Exception as e:
     rag_chain = None
     st.error(f"Failed to initialize RAG chain: {e}")

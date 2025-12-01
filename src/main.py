@@ -1,13 +1,28 @@
 import os
+import argparse
 from termcolor import cprint
 from langchain_core.messages import HumanMessage, AIMessage
 from rag import setup_rag_chain
 
 
 def main():
+    parser = argparse.ArgumentParser(description="MPNeuralNetwork RAG CLI Agent")
+    parser.add_argument(
+        "--k", type=int, default=4, help="Number of documents to retrieve (default: 4)"
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.7,
+        help="LLM temperature/creativity (default: 0.7)",
+    )
+    args = parser.parse_args()
+
     cprint("Initializing MPNeuralNetwork RAG Agent...", "cyan")
+    cprint(f"Settings: k={args.k}, temperature={args.temperature}", "grey")
+
     try:
-        rag_chain = setup_rag_chain()
+        rag_chain = setup_rag_chain(k=args.k, temperature=args.temperature)
     except Exception as e:
         cprint(f"Initialization error: {e}", "red")
         import traceback
