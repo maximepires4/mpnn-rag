@@ -5,8 +5,11 @@ This project implements a Retrieval-Augmented Generation (RAG) agent designed to
 ## Features
 
 * **Repository Ingestion**: Clones a specified Git repository, loads Python source files and Markdown documentation, and filters out test/benchmark files.
-* **Vector Database Creation**: Splits documents into manageable chunks and stores them in a Chroma vector database using configurable embedding models.
+* **Advanced Retrieval**: Implements **Hybrid Search** (combining BM25 keyword search and Chroma vector search) and **Re-ranking** (using a Cross-Encoder) to ensure high-precision context retrieval.
+* **Intelligent Code Processing**: Utilizes language-specific chunking for Python and Markdown files to preserve semantic boundaries (functions, classes, headers).
+* **Conversational Memory**: Maintains chat history, allowing for context-aware follow-up questions and a natural conversation flow.
 * **Configurable LLMs**: Supports Google Gemini, OpenAI, and local Ollama models for generating answers.
+* **Adjustable Parameters**: Dynamically control the number of retrieved documents (`k`) and the LLM's creativity (`temperature`) via the UI or CLI.
 * **Streamlit Web Interface**: An interactive and user-friendly web application for asking questions and viewing sources.
 * **Command Line Interface (CLI)**: A simple terminal-based interface for interacting with the RAG agent.
 * **Modular Design**: Clean separation of concerns with dedicated modules for configuration, data ingestion, RAG chain setup, and user interfaces.
@@ -86,13 +89,14 @@ This script will clone the `REPO_URL` specified in your `.env` file, process the
 
 ### 2. Run the Streamlit Web Application
 
-For an interactive chat interface:
+For an interactive chat interface with adjustable settings:
 
 ```bash
 streamlit run src/app.py
 ```
 
 This will open the application in your web browser, usually at `http://localhost:8501`. You can ask questions about the `MPNeuralNetwork` library and see the generated answers along with the sources.
+**Note:** You can adjust the retrieval count (`k`) and temperature in the sidebar settings.
 
 ### 3. Run the Command Line Interface (CLI) Application
 
@@ -101,6 +105,15 @@ For a text-based interactive experience:
 ```bash
 python src/main.py
 ```
+
+You can also specify parameters directly:
+
+```bash
+python src/main.py --k 6 --temperature 0.5
+```
+
+- `--k`: Number of documents to retrieve for context (default: 4).
+- `--temperature`: Controls the creativity of the LLM (default: 0.7).
 
 You can type your questions in the terminal, and the agent will respond. Type `exit` or `quit` to end the session.
 
