@@ -13,3 +13,4 @@ markdown
 langchain-huggingface
 streamlit
 watchdog
+rank_bm25
