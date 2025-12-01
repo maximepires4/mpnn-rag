@@ -6,7 +6,7 @@ from langchain_community.document_loaders import (
     PythonLoader,
     UnstructuredMarkdownLoader,
 )
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_chroma import Chroma
 from config import get_embeddings, get_repo_config, get_persist_directory
 
@@ -48,13 +48,42 @@ def load_documents(repo_path):
 
 
 def split_documents(documents):
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len,
+    python_docs = []
+    markdown_docs = []
+    other_docs = []
+
+    for doc in documents:
+        source = doc.metadata.get("source", "").lower()
+        if source.endswith(".py"):
+            python_docs.append(doc)
+        elif source.endswith(".md"):
+            markdown_docs.append(doc)
+        else:
+            other_docs.append(doc)
+
+    chunks = []
+
+    if python_docs:
+        python_splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.PYTHON, chunk_size=1000, chunk_overlap=200
+        )
+        chunks.extend(python_splitter.split_documents(python_docs))
+
+    if markdown_docs:
+        markdown_splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.MARKDOWN, chunk_size=1000, chunk_overlap=200
+        )
+        chunks.extend(markdown_splitter.split_documents(markdown_docs))
+
+    if other_docs:
+        generic_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000, chunk_overlap=200
+        )
+        chunks.extend(generic_splitter.split_documents(other_docs))
+
+    print(
+        f"Split into {len(chunks)} chunks (Python: {len(python_docs)} docs, Markdown: {len(markdown_docs)} docs)."
     )
-    chunks = text_splitter.split_documents(documents)
-    print(f"Split into {len(chunks)} chunks.")
     return chunks
 
 
@@ -91,4 +120,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
