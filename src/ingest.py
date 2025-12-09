@@ -8,7 +8,10 @@ from langchain_community.document_loaders import (
 )
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_chroma import Chroma
-from config import get_embeddings, get_repo_config, get_persist_directory
+from langchain_huggingface import HuggingFaceEmbeddings
+
+from utils import get_repo_config
+import config
 
 
 def clone_repository(repo_url, repo_path, branch):
@@ -39,7 +42,7 @@ def load_documents(repo_path):
     documents = []
     for doc in all_docs:
         source = doc.metadata.get("source", "")
-        if any(x in source for x in ["/tests/", "/benchmark/", "/test_", "_test.py"]):
+        if any(x in source for x in ["/tests/", "/benchmark/"]):
             continue
         documents.append(doc)
 
@@ -65,13 +68,17 @@ def split_documents(documents):
 
     if python_docs:
         python_splitter = RecursiveCharacterTextSplitter.from_language(
-            language=Language.PYTHON, chunk_size=1000, chunk_overlap=200
+            language=Language.PYTHON,
+            chunk_size=config.PYTHON_CHUNK_SIZE,
+            chunk_overlap=config.PYTHON_CHUNK_OVERLAP,
         )
         chunks.extend(python_splitter.split_documents(python_docs))
 
     if markdown_docs:
         markdown_splitter = RecursiveCharacterTextSplitter.from_language(
-            language=Language.MARKDOWN, chunk_size=1000, chunk_overlap=200
+            language=Language.MARKDOWN,
+            chunk_size=config.MARKDOWN_CHUNK_SIZE,
+            chunk_overlap=config.MARKDOWN_CHUNK_OVERLAP,
         )
         chunks.extend(markdown_splitter.split_documents(markdown_docs))
 
@@ -88,17 +95,21 @@ def split_documents(documents):
 
 
 def create_vector_db(chunks):
-    persist_directory = get_persist_directory()
+    persist_directory = config.CHROMA_DIR
 
     if os.path.exists(persist_directory):
+        print(f"Removing existing database at {persist_directory}")
         shutil.rmtree(persist_directory)
 
     print("Creating vector database ...")
-    embedding_function = get_embeddings()
+
+    embedding = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-mpnet-base-v2"
+    )
 
     Chroma.from_documents(
         documents=chunks,
-        embedding=embedding_function,
+        embedding=embedding,
         persist_directory=persist_directory,
     )
     print(f"Database successfully created in {persist_directory}")
@@ -106,13 +117,10 @@ def create_vector_db(chunks):
 
 def main():
     repo_config = get_repo_config()
-    repo_path = os.path.join(os.getcwd(), "data", "repo")
+    repo_path = config.REPO_DIR
 
     clone_repository(repo_config["url"], repo_path, repo_config["branch"])
     documents = load_documents(repo_path)
-    if not documents:
-        print("No documents found!")
-        return
 
     chunks = split_documents(documents)
     create_vector_db(chunks)
