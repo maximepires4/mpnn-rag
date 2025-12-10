@@ -1,139 +1,91 @@
-# MPNN RAG Agent
+# MPNeuralNetwork RAG Agent
 
-This project implements a Retrieval-Augmented Generation (RAG) agent designed to answer questions about the [MPNeuralNetwork](https://github.com/maximepires4/mp-neural-network) library, my Deep Learning framework built from scratch. It leverages various LLMs (Gemini, OpenAI, Ollama) and embedding models to create a vector database from the library's codebase and documentation, providing relevant information and code examples to developers.
+This advanced RAG (Retrieval-Augmented Generation) agent allows developers to chat with the [MPNeuralNetwork](https://github.com/maximepires4/mp-neural-network) deep learning library. It understands the codebase structure (classes, functions) and provides precise, context-aware answers with code examples.
 
-## Features
+## ✨ Features
 
-* **Repository Ingestion**: Clones a specified Git repository, loads Python source files and Markdown documentation, and filters out test/benchmark files.
-* **Advanced Retrieval**: Implements **Hybrid Search** (combining BM25 keyword search and Chroma vector search) and **Re-ranking** (using a Cross-Encoder) to ensure high-precision context retrieval.
-* **Intelligent Code Processing**: Utilizes language-specific chunking for Python and Markdown files to preserve semantic boundaries (functions, classes, headers).
-* **Conversational Memory**: Maintains chat history, allowing for context-aware follow-up questions and a natural conversation flow.
-* **Configurable LLMs**: Supports Google Gemini, OpenAI, and local Ollama models for generating answers.
-* **Adjustable Parameters**: Dynamically control the number of retrieved documents (`k`) and the LLM's creativity (`temperature`) via the UI or CLI.
-* **Streamlit Web Interface**: An interactive and user-friendly web application for asking questions and viewing sources.
-* **Command Line Interface (CLI)**: A simple terminal-based interface for interacting with the RAG agent.
-* **Modular Design**: Clean separation of concerns with dedicated modules for configuration, data ingestion, RAG chain setup, and user interfaces.
+* **Smart Code Understanding**:
+  * **AST Enrichment**: Parses Python code to attach context (e.g., "This chunk is from `MPNetwork.train`").
+  * **Context-Aware**: Knows exactly which file and lines a snippet comes from.
+* **Hybrid Search Engine**:
+  * **Ensemble Retrieval**: Combines Semantic Search (MPNet) + Keyword Search (BM25) for maximum accuracy.
+  * **State-of-the-Art Reranking**: Uses **BGE-M3** (Large) or **MS-Marco** (Small) to filter results.
+* **High Performance**:
+  * **Streaming**: Real-time answer generation.
+  * **Configurable**: Switch between Accuracy (Large Reranker) and Speed (Small Reranker) instantly.
+* **Dual Interface**:
+  * **Web App (Streamlit)**: Complete UI with sidebar settings.
+  * **CLI**: Fast terminal tool for power users.
 
-## Setup
+## Quick Start
 
-Follow these steps to get the project up and running locally.
-
-### Prerequisites
-
-* Python 3.9+
-* Git
-
-### 1. Clone the repository
+### 1. Installation
 
 ```bash
+# Clone the repo
 git clone https://github.com/maximepires4/mpnn-rag.git
 cd mpnn-rag
-```
 
-### 2. Create and activate a virtual environment
-
-It's highly recommended to use a virtual environment to manage dependencies.
-
-```bash
+# Setup Virtual Env
 python -m venv .venv
-source .venv/bin/activate
-```
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-### 3. Install dependencies
-
-Install the required Python packages:
-
-```bash
+# Install Dependencies
 pip install -r requirements.txt
 ```
 
-### 4. Environment Variables
+### 2. Configuration
 
-Create a `.env` file in the project root directory based on `.env.example` and fill in the necessary API keys and configurations.
+Create a `.env` file:
 
-```
-# .env file example
-
-# Google API Key
-GOOGLE_API_KEY="YOUR_GEMINI_API_KEY"
-
-# OpenAI API Key
-OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
-
-# LLM Configuration ("gemini", "openai", "ollama")
-LLM_TYPE="gemini" 
-
-# Ollama Model Name (if LLM_TYPE is "ollama")
-OLLAMA_MODEL="llama3" 
-
-# Embeddings Configuration ("local", "gemini", "openai")
-# "local" uses 'all-MiniLM-L6-v2' via HuggingFaceEmbeddings
-EMBEDDINGS_TYPE="local"
-
-# Repository to ingest
-REPO_URL="https://github.com/maximepires4/mp-neural-network"
-REPO_BRANCH="main"
+```bash
+cp .env.example .env
 ```
 
-## Usage
+Add your API Key (Google Gemini is default and free tier friendly):
 
-### 1. Data Ingestion (Build the Knowledge Base)
+```env
+GOOGLE_API_KEY="your_api_key_here"
+```
 
-Before you can query the RAG agent, you need to ingest the target repository and build the vector database.
+### 3. Ingestion (Important!)
+
+You must build the knowledge base first. This downloads the repo and indexes the code.
 
 ```bash
 python src/ingest.py
 ```
 
-This script will clone the `REPO_URL` specified in your `.env` file, process the code and documentation, and create a vector database in `data/chroma_db/`.
+### 4. Run the Agent
 
-### 2. Run the Streamlit Web Application
-
-For an interactive chat interface with adjustable settings:
+**Web Interface:**
 
 ```bash
 streamlit run src/app.py
 ```
 
-This will open the application in your web browser, usually at `http://localhost:8501`. You can ask questions about the `MPNeuralNetwork` library and see the generated answers along with the sources.
-**Note:** You can adjust the retrieval count (`k`) and temperature in the sidebar settings.
-
-### 3. Run the Command Line Interface (CLI) Application
-
-For a text-based interactive experience:
+**Terminal Interface:**
 
 ```bash
-python src/main.py
+python src/main.py --reranker large
 ```
 
-You can also specify parameters directly:
+## Configuration Options
 
-```bash
-python src/main.py --k 6 --temperature 0.5
-```
+| Parameter | CLI Flag | Web UI | Description |
+| :--- | :--- | :--- | :--- |
+| **Retrieval Count** | `--k 4` | Slider | Number of code snippets to fetch. |
+| **Creativity** | `--temperature 0.7` | Slider | 0.0 (Factual) to 1.0 (Creative). |
+| **Reranker** | `--reranker large` | Selectbox | **Large** (BGE-M3, SOTA) or **Small** (MS-Marco, Fast). |
 
-- `--k`: Number of documents to retrieve for context (default: 4).
-- `--temperature`: Controls the creativity of the LLM (default: 0.7).
+## Architecture
 
-You can type your questions in the terminal, and the agent will respond. Type `exit` or `quit` to end the session.
+* **Ingestion**: `Documents` -> `Split (1000 chars)` -> `AST Enrichment` -> `ChromaDB`
+* **Retrieval**: `Query` -> `Hybrid Search (Dense + BM25)` -> `Top-3*k Candidates`
+* **Refinement**: `Candidates` -> `Cross-Encoder Reranking` -> `Top-k Context`
+* **Generation**: `Context + History` -> `LLM` -> `Streamed Answer`
 
-## Project Structure
-
-* `src/`: Contains the main application source code.
-  * `config.py`: Centralized configuration for LLMs, embeddings, and repository settings.
-  * `ingest.py`: Script to clone the repository, load documents, split them, and build the Chroma vector database.
-  * `rag.py`: Defines the RAG chain setup, including prompt engineering and retriever configuration.
-  * `main.py`: The command-line interface (CLI) for the RAG agent.
-  * `app.py`: The Streamlit web application interface.
-* `data/`: Directory for storing the cloned repository and the Chroma vector database.
-  * `repo/`: Cloned `MPNeuralNetwork` repository.
-  * `chroma_db/`: Persistent storage for the Chroma vector database.
-* `.env`: Your environment variables (API keys, configuration).
-* `.env.example`: Example file for `.env`.
-* `requirements.txt`: List of Python dependencies.
-
-## **Author**
+## Author
 
 **Maxime Pires** - *AI Engineer | CentraleSupelec*
-
-[LinkedIn](https://www.linkedin.com/in/maximepires) | [Portfolio](https://github.com/maximepires4)
+[LinkedIn](https://www.linkedin.com/in/maximepires) | [GitHub](https://github.com/maximepires4)

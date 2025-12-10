@@ -3,6 +3,7 @@ import argparse
 from termcolor import cprint
 from langchain_core.messages import HumanMessage, AIMessage
 from rag import setup_rag_chain
+import config
 
 
 def main():
@@ -16,13 +17,26 @@ def main():
         default=0.7,
         help="LLM temperature/creativity (default: 0.7)",
     )
+    parser.add_argument(
+        "--reranker",
+        type=str,
+        default="large",
+        help="Reranker model: 'large', 'small', or HuggingFace ID (default: large)",
+    )
     args = parser.parse_args()
 
+    # Resolve reranker shortcut
+    reranker_model = config.AVAILABLE_RERANKERS.get(args.reranker, args.reranker)
+
     cprint("Initializing MPNeuralNetwork RAG Agent...", "cyan")
-    cprint(f"Settings: k={args.k}, temperature={args.temperature}", "grey")
+    cprint(f"Settings: k={args.k}, temp={args.temperature}, reranker={reranker_model}", "grey")
 
     try:
-        rag_chain = setup_rag_chain(k=args.k, temperature=args.temperature)
+        rag_chain = setup_rag_chain(
+            k=args.k, 
+            temperature=args.temperature,
+            reranker_model=reranker_model
+        )
     except Exception as e:
         cprint(f"Initialization error: {e}", "red")
         import traceback

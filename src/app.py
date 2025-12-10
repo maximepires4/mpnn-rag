@@ -3,6 +3,7 @@ import os
 from langchain_core.messages import HumanMessage, AIMessage
 from rag import setup_rag_chain
 from ingest import main as run_ingestion
+import config
 
 st.set_page_config(
     page_title="MPNeuralNetwork Assistant", page_icon="🤖", layout="wide"
@@ -34,6 +35,15 @@ with st.sidebar:
         step=0.1,
         help="Controls the randomness of the output.",
     )
+    
+    reranker_option = st.selectbox(
+        "Reranker Model",
+        options=list(config.AVAILABLE_RERANKERS.keys()),
+        index=0, # Default to large
+        format_func=lambda x: f"{x.capitalize()} ({config.AVAILABLE_RERANKERS[x].split('/')[-1]})",
+        help="Choose 'Large' for better accuracy or 'Small' for speed."
+    )
+    reranker_param = config.AVAILABLE_RERANKERS[reranker_option]
 
     if st.button(
         "🔄 Update Knowledge Base",
@@ -56,12 +66,12 @@ with st.sidebar:
 
 
 @st.cache_resource
-def get_rag_chain(k, temperature):
-    return setup_rag_chain(k=k, temperature=temperature)
+def get_rag_chain(k, temperature, reranker):
+    return setup_rag_chain(k=k, temperature=temperature, reranker_model=reranker)
 
 
 try:
-    rag_chain = get_rag_chain(k_param, temperature_param)
+    rag_chain = get_rag_chain(k_param, temperature_param, reranker_param)
 except Exception as e:
     rag_chain = None
     st.error(f"Failed to initialize RAG chain: {e}")
@@ -95,26 +105,50 @@ if prompt := st.chat_input("How do I create a custom layer?"):
 
             with st.spinner("Analyzing codebase..."):
                 try:
-                    response = rag_chain.invoke(
+                    # Stream the response
+                    full_response = ""
+                    context_docs = []
+                    
+                    stream = rag_chain.stream(
                         {"input": prompt, "chat_history": chat_history}
                     )
-                    answer = response["answer"]
-
-                    message_placeholder.markdown(answer)
+                    
+                    for chunk in stream:
+                        if "answer" in chunk:
+                            content = chunk["answer"]
+                            full_response += content
+                            message_placeholder.markdown(full_response + "▌")
+                        if "context" in chunk:
+                            context_docs = chunk["context"]
+                    
+                    message_placeholder.markdown(full_response)
 
                     st.session_state.messages.append(
-                        {"role": "assistant", "content": answer}
+                        {"role": "assistant", "content": full_response}
                     )
 
-                    if "context" in response and response["context"]:
+                    if context_docs:
                         with st.expander("📚 Sources Used"):
-                            seen_sources = set()
-                            for doc in response["context"]:
-                                source = doc.metadata.get("source", "Unknown")
-                                display_source = os.path.relpath(source, os.getcwd())
-                                if display_source not in seen_sources:
-                                    st.markdown(f"- `{display_source}`")
-                                    seen_sources.add(display_source)
+                            unique_citations = {}
+                            for doc in context_docs:
+                                src = doc.metadata.get("source", "Unknown")
+                                fname = os.path.basename(src)
+                                start = doc.metadata.get("start_line", "?")
+                                end = doc.metadata.get("end_line", "?")
+                                ctx = doc.metadata.get("context", "")
+                                ctx_type = doc.metadata.get("context_type", "")
+
+                                citation_key = f"{fname}:{start}-{end}"
+                                if citation_key not in unique_citations:
+                                    # Format: file.py (L10-20) [Function 'train']
+                                    details = f"**{fname}**"
+                                    if start != "?":
+                                        details += f" (L{start}-{end})"
+                                    if ctx:
+                                        details += f" `[{ctx}]`"
+                                    
+                                    st.markdown(f"- {details}")
+                                    unique_citations[citation_key] = True
 
                 except Exception as e:
                     st.error(f"An error occurred: {e}")

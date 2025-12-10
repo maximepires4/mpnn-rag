@@ -22,9 +22,7 @@ import config
 
 
 def format_docs_with_metadata(docs):
-    """
-    Format documents for the LLM, including rich metadata context.
-    """
+    """Format documents for the LLM, including rich metadata context."""
     formatted = []
     for doc in docs:
         source = doc.metadata.get("source", "Unknown")
@@ -33,7 +31,6 @@ def format_docs_with_metadata(docs):
         start_line = doc.metadata.get("start_line", "?")
         end_line = doc.metadata.get("end_line", "?")
 
-        # Create a header with file info and code context (Class/Function)
         header = f"File: {source}"
         if start_line != "?":
             header += f" (Lines {start_line}-{end_line})"
@@ -45,7 +42,7 @@ def format_docs_with_metadata(docs):
     return "\n\n".join(formatted)
 
 
-def setup_rag_chain(k=4, temperature=0.7):
+def setup_rag_chain(k=4, temperature=0.7, reranker_model=config.RERANKER_MODEL_NAME):
     persist_directory = config.CHROMA_DIR
 
     if not os.path.exists(persist_directory):
@@ -87,8 +84,9 @@ def setup_rag_chain(k=4, temperature=0.7):
         )
 
     # 2. Re-ranking
-    # Using a high-quality Cross-Encoder model
-    compressor_model = HuggingFaceCrossEncoder(model_name="BAAI/bge-reranker-v2-m3")
+    # Using the configurable Cross-Encoder model
+    print(f"Initializing Reranker: {reranker_model}")
+    compressor_model = HuggingFaceCrossEncoder(model_name=reranker_model)
     document_compressor = CrossEncoderReranker(model=compressor_model, top_n=k)
 
     retriever = ContextualCompressionRetriever(
@@ -138,7 +136,6 @@ def setup_rag_chain(k=4, temperature=0.7):
     )
 
     # Custom LCEL Chain
-    # Using RunnablePassthrough to format context manually using our custom function
     question_answer_chain = (
         RunnablePassthrough.assign(
             context=lambda x: format_docs_with_metadata(x["context"])
@@ -151,4 +148,3 @@ def setup_rag_chain(k=4, temperature=0.7):
     rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
 
     return rag_chain
-
