@@ -57,9 +57,7 @@ def ingest_documents(documents):
 
     print("Processing documents and creating Vector DB...")
 
-    embedding = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-mpnet-base-v2"
-    )
+    embedding = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL_NAME)
 
     chunks = []
 
@@ -98,6 +96,7 @@ def ingest_documents(documents):
 
     print("Creating vector database...")
     Chroma.from_documents(
+        collection_name=config.CHROMA_COLLECTION_NAME,
         documents=chunks,
         embedding=embedding,
         persist_directory=config.CHROMA_DIR,

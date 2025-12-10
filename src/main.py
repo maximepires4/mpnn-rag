@@ -51,24 +51,47 @@ def main():
                 continue
 
             cprint("Searching...", "grey")
-
-            response = rag_chain.invoke({"input": query, "chat_history": chat_history})
-
             print("\n🤖 \033[1mAssistant:\033[0m")
-            print(response["answer"])
+
+            full_answer = ""
+            sources = []
+
+            # Streaming loop
+            for chunk in rag_chain.stream({"input": query, "chat_history": chat_history}):
+                if "answer" in chunk:
+                    content = chunk["answer"]
+                    print(content, end="", flush=True)
+                    full_answer += content
+                if "context" in chunk:
+                    sources = chunk["context"]
+            
+            print() # Newline after streaming
 
             chat_history.append(HumanMessage(content=query))
-            chat_history.append(AIMessage(content=response["answer"]))
+            chat_history.append(AIMessage(content=full_answer))
 
-            # Display sources
+            # Display detailed sources
             print("\n\033[90m--- Sources used ---\033[0m")
-            if "context" in response:
-                seen_sources = set()
-                for doc in response["context"]:
-                    source = doc.metadata.get("source", "Unknown")
-                    if source not in seen_sources:
-                        print(f"\033[90m- {os.path.basename(source)}\033[0m")
-                        seen_sources.add(source)
+            if sources:
+                # Deduplicate based on unique content location
+                unique_citations = {}
+                for doc in sources:
+                    src = doc.metadata.get("source", "Unknown")
+                    fname = os.path.basename(src)
+                    start = doc.metadata.get("start_line", "?")
+                    end = doc.metadata.get("end_line", "?")
+                    ctx = doc.metadata.get("context", "")
+                    
+                    citation_key = f"{fname}:{start}-{end}"
+                    if citation_key not in unique_citations:
+                        details = f"\033[90m- {fname}"
+                        if start != "?":
+                            details += f" (L{start}-{end})"
+                        if ctx:
+                            details += f" [{ctx}]"
+                        details += "\033[0m"
+                        unique_citations[citation_key] = details
+                        print(details)
 
         except KeyboardInterrupt:
             cprint("\nInterruption detected. Goodbye!", "yellow")
