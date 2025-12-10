@@ -11,6 +11,7 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from utils import get_repo_config
+from enrichment import enrich_python_metadata
 import config
 
 
@@ -50,69 +51,58 @@ def load_documents(repo_path):
     return documents
 
 
-def split_documents(documents):
-    python_docs = []
-    markdown_docs = []
-    other_docs = []
+def ingest_documents(documents):
+    if os.path.exists(config.CHROMA_DIR):
+        shutil.rmtree(config.CHROMA_DIR)
 
-    for doc in documents:
-        source = doc.metadata.get("source", "").lower()
-        if source.endswith(".py"):
-            python_docs.append(doc)
-        elif source.endswith(".md"):
-            markdown_docs.append(doc)
-        else:
-            other_docs.append(doc)
-
-    chunks = []
-
-    if python_docs:
-        python_splitter = RecursiveCharacterTextSplitter.from_language(
-            language=Language.PYTHON,
-            chunk_size=config.PYTHON_CHUNK_SIZE,
-            chunk_overlap=config.PYTHON_CHUNK_OVERLAP,
-        )
-        chunks.extend(python_splitter.split_documents(python_docs))
-
-    if markdown_docs:
-        markdown_splitter = RecursiveCharacterTextSplitter.from_language(
-            language=Language.MARKDOWN,
-            chunk_size=config.MARKDOWN_CHUNK_SIZE,
-            chunk_overlap=config.MARKDOWN_CHUNK_OVERLAP,
-        )
-        chunks.extend(markdown_splitter.split_documents(markdown_docs))
-
-    if other_docs:
-        generic_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=200
-        )
-        chunks.extend(generic_splitter.split_documents(other_docs))
-
-    print(
-        f"Split into {len(chunks)} chunks (Python: {len(python_docs)} docs, Markdown: {len(markdown_docs)} docs)."
-    )
-    return chunks
-
-
-def create_vector_db(chunks):
-    persist_directory = config.CHROMA_DIR
-
-    if os.path.exists(persist_directory):
-        print(f"Removing existing database at {persist_directory}")
-        shutil.rmtree(persist_directory)
-
-    print("Creating vector database ...")
+    print("Processing documents and creating Vector DB...")
 
     embedding = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-mpnet-base-v2"
     )
 
+    chunks = []
+
+    python_docs = [d for d in documents if d.metadata.get("source", "").endswith(".py")]
+    md_docs = [d for d in documents if d.metadata.get("source", "").endswith(".md")]
+    other_docs = [d for d in documents if d not in python_docs and d not in md_docs]
+
+    if python_docs:
+        py_splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.PYTHON,
+            chunk_size=config.CHUNK_SIZE,
+            chunk_overlap=config.CHUNK_OVERLAP,
+        )
+
+        for doc in python_docs:
+            doc_chunks = py_splitter.split_documents([doc])
+            doc_chunks = enrich_python_metadata(doc, doc_chunks)
+            chunks.extend(doc_chunks)
+
+    if md_docs:
+        md_splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.MARKDOWN,
+            chunk_size=config.CHUNK_SIZE,
+            chunk_overlap=config.CHUNK_OVERLAP,
+        )
+        chunks.extend(md_splitter.split_documents(md_docs))
+
+    if other_docs:
+        generic_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=config.CHUNK_SIZE,
+            chunk_overlap=config.CHUNK_OVERLAP,
+        )
+        chunks.extend(generic_splitter.split_documents(other_docs))
+
+    print(f"Split documents into {len(chunks)} enriched chunks.")
+
+    print("Creating vector database...")
     Chroma.from_documents(
         documents=chunks,
         embedding=embedding,
-        persist_directory=persist_directory,
+        persist_directory=config.CHROMA_DIR,
     )
-    print(f"Database successfully created in {persist_directory}")
+    print(f"Database successfully created in {config.CHROMA_DIR}")
 
 
 def main():
@@ -122,8 +112,7 @@ def main():
     clone_repository(repo_config["url"], repo_path, repo_config["branch"])
     documents = load_documents(repo_path)
 
-    chunks = split_documents(documents)
-    create_vector_db(chunks)
+    ingest_documents(documents)
 
 
 if __name__ == "__main__":
