@@ -2,7 +2,7 @@
 
 This advanced RAG (Retrieval-Augmented Generation) agent allows developers to chat with the [MPNeuralNetwork](https://github.com/maximepires4/mp-neural-network) deep learning library. It understands the codebase structure (classes, functions) and provides precise, context-aware answers with code examples.
 
-## ✨ Features
+## Features
 
 * **Smart Code Understanding**:
   * **AST Enrichment**: Parses Python code to attach context (e.g., "This chunk is from `MPNetwork.train`").
